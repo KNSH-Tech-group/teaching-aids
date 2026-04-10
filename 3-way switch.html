@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>雙切電路模擬器</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Noto Sans TC', sans-serif; margin: 0; position: relative; }
+
+    /* === LOGO 樣式修改區塊 === */
+    .kns-logo-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 100;
+        /* 白色底框、內距、圓角和陰影已刪除 */
+    }
+    .kns-logo-container img {
+        height: 48px; /* <--- 高度已修改為 48px (原 60px 的 80%) */
+        width: auto;
+        display: block;
+    }
+
+    .switch-hit { cursor: pointer; }
+    .switch-hit:hover .switch-lever { filter: brightness(1.2); }
+
+    .glow-on {
+      filter: drop-shadow(0 0 18px #ffe066) drop-shadow(0 0 40px #ffd600);
+    }
+    .glow-off { filter: none; }
+
+    .wire-active { stroke: #ef4444; transition: stroke 0.3s; }
+    .wire-inactive { stroke: #6b7280; transition: stroke 0.3s; }
+
+    .lever-transition { transition: transform 0.25s cubic-bezier(.4,2,.6,1); }
+
+    @keyframes pulse-glow {
+      0%, 100% { filter: drop-shadow(0 0 18px #ffe066) drop-shadow(0 0 40px #ffd600); }
+      50% { filter: drop-shadow(0 0 28px #ffe066) drop-shadow(0 0 60px #ffd600); }
+    }
+    .bulb-glow-anim { animation: pulse-glow 1.8s ease-in-out infinite; }
+
+    .status-bar {
+      transition: background 0.4s, color 0.4s;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div id="app" class="h-full w-full flex flex-col" style="background: #0f172a; overflow: auto;">
+    
+    <div class="kns-logo-container">
+        <img src="LOGO/logo.png" alt="康軒生活科技" />
+    </div>
+
+   <header class="text-center py-5 px-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+    <h1 id="pageTitle" class="text-4xl md:text-5xl font-black tracking-wide" style="color: #f8fafc; font-family: 'Noto Sans TC', sans-serif;">雙切電路模擬器</h1>
+    <p class="mt-2 text-xl" style="color: #64748b;">點擊開關 A 或 B 切換電路</p>
+   </header>
+
+   <div class="flex-1 flex items-center justify-center px-4 py-4" style="min-height: 0;">
+    <svg id="circuit" viewbox="0 0 800 400" style="max-width: 860px; width: 100%; height: auto;" xmlns="http://www.w3.org/2000/svg">
+     <defs>
+      <filter id="bulbGlow">
+       <fegaussianblur stddeviation="8" result="blur" />
+       <femerge>
+        <femergenode in="blur" />
+        <femergenode in="SourceGraphic" />
+       </femerge>
+      </filter>
+     </defs>
+     <rect width="800" height="400" fill="#0f172a" rx="16" />
+     <line id="wireL" x1="80" y1="200" x2="200" y2="200" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wire1L" x1="240" y1="140" x2="380" y2="140" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wire1M" x1="380" y1="140" x2="500" y2="140" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wire1R" x1="500" y1="140" x2="560" y2="140" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wire2L" x1="240" y1="260" x2="380" y2="260" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wire2M" x1="380" y1="260" x2="500" y2="260" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wire2R" x1="500" y1="260" x2="560" y2="260" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wireR" x1="600" y1="200" x2="700" y2="200" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wireReturnUp" x1="55" y1="170" x2="55" y2="50" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wireReturnTop" x1="55" y1="50" x2="720" y2="50" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <line id="wireReturnDown" x1="720" y1="50" x2="720" y2="170" stroke-width="4" stroke-linecap="round" class="wire-inactive" />
+     <text x="400" y="122" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="JetBrains Mono, monospace">導線 1</text>
+     <text x="400" y="295" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="JetBrains Mono, monospace">導線 2</text>
+     <circle cx="240" cy="140" r="5" fill="#475569" />
+     <circle cx="240" cy="260" r="5" fill="#475569" />
+     <circle cx="560" cy="140" r="5" fill="#475569" />
+     <circle cx="560" cy="260" r="5" fill="#475569" />
+     <g id="power">
+      <rect x="30" y="170" width="50" height="60" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2.5" />
+      <text x="55" y="206" text-anchor="middle" fill="#3b82f6" font-size="20" font-weight="bold" font-family="JetBrains Mono, monospace">S</text>
+      <text x="55" y="248" text-anchor="middle" fill="#64748b" font-size="18">電源</text>
+     </g>
+     <g id="switchAGroup" class="switch-hit">
+      <rect x="190" y="165" width="60" height="70" rx="10" fill="#1e293b" stroke="#8b5cf6" stroke-width="2" />
+      <text x="220" y="255" text-anchor="middle" fill="#8b5cf6" font-size="15" font-weight="bold">開關 A</text>
+      <circle cx="220" cy="200" r="6" fill="#8b5cf6" />
+      <line id="leverA" x1="220" y1="200" x2="240" y2="140" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round" class="lever-transition" />
+     </g>
+     <g id="switchBGroup" class="switch-hit">
+      <rect x="550" y="165" width="60" height="70" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2" />
+      <text x="580" y="255" text-anchor="middle" fill="#f59e0b" font-size="15" font-weight="bold">開關 B</text>
+      <circle cx="580" cy="200" r="6" fill="#f59e0b" />
+      <line id="leverB" x1="580" y1="200" x2="560" y2="140" stroke="#fcd34d" stroke-width="5" stroke-linecap="round" class="lever-transition" />
+     </g>
+     <g id="bulbGroup" class="glow-off">
+      <circle id="bulbOuter" cx="720" cy="200" r="30" fill="#1e293b" stroke="#475569" stroke-width="2.5" />
+      <circle id="bulbInner" cx="720" cy="200" r="20" fill="#334155" />
+      <path d="M712 210 Q716 190 720 210 Q724 190 728 210" fill="none" stroke="#475569" stroke-width="2" id="filament" />
+      <text x="720" y="250" text-anchor="middle" fill="#64748b" font-size="18">燈泡</text>
+     </g>
+    </svg>
+   </div>
+
+   <div id="statusBar" class="status-bar text-center py-4 px-4" style="background: #1e293b;">
+    <p id="statusText" class="text-xl md:text-2xl font-bold" style="color: #94a3b8; font-family: 'Noto Sans TC', sans-serif;">目前狀態：斷路 (燈滅)</p>
+   </div>
+  </div>
+
+  <script>
+  let switchA = 1; 
+  let switchB = 1;
+
+  const defaultConfig = {
+    page_title: '雙切電路模擬器',
+    status_on_text: '目前狀態：通路 (燈亮) 💡',
+    status_off_text: '目前狀態：斷路 (燈滅)',
+    background_color: '#0f172a'
+  };
+
+  const leverA = document.getElementById('leverA');
+  const leverB = document.getElementById('leverB');
+  const statusText = document.getElementById('statusText');
+  const statusBar = document.getElementById('statusBar');
+  const bulbGroup = document.getElementById('bulbGroup');
+  const bulbInner = document.getElementById('bulbInner');
+  const bulbOuter = document.getElementById('bulbOuter');
+  const filament = document.getElementById('filament');
+
+  const wireIds = {
+    L: document.getElementById('wireL'),
+    '1L': document.getElementById('wire1L'), '1M': document.getElementById('wire1M'), '1R': document.getElementById('wire1R'),
+    '2L': document.getElementById('wire2L'), '2M': document.getElementById('wire2M'), '2R': document.getElementById('wire2R'),
+    R: document.getElementById('wireR'),
+    ReturnUp: document.getElementById('wireReturnUp'),
+    ReturnTop: document.getElementById('wireReturnTop'),
+    ReturnDown: document.getElementById('wireReturnDown')
+  };
+
+  function updateCircuit() {
+    const isOn = switchA === switchB;
+    leverA.setAttribute('y2', switchA === 1 ? '140' : '260');
+    leverB.setAttribute('y2', switchB === 1 ? '140' : '260');
+
+    Object.values(wireIds).forEach(w => { w.setAttribute('class', 'wire-inactive'); });
+
+    if (isOn) {
+      wireIds.L.className.baseVal = 'wire-active';
+      wireIds.R.className.baseVal = 'wire-active';
+      wireIds.ReturnUp.className.baseVal = 'wire-active';
+      wireIds.ReturnTop.className.baseVal = 'wire-active';
+      wireIds.ReturnDown.className.baseVal = 'wire-active';
+      const prefix = switchA === 1 ? '1' : '2';
+      wireIds[prefix+'L'].className.baseVal = 'wire-active';
+      wireIds[prefix+'M'].className.baseVal = 'wire-active';
+      wireIds[prefix+'R'].className.baseVal = 'wire-active';
+
+      bulbInner.setAttribute('fill', '#fde047');
+      bulbOuter.setAttribute('stroke', '#facc15');
+      filament.setAttribute('stroke', '#a16207');
+      bulbGroup.setAttribute('class', 'bulb-glow-anim');
+      statusText.textContent = defaultConfig.status_on_text;
+      statusText.style.color = '#fde047';
+      statusBar.style.background = '#1c1917';
+    } else {
+      bulbInner.setAttribute('fill', '#334155');
+      bulbOuter.setAttribute('stroke', '#475569');
+      filament.setAttribute('stroke', '#475569');
+      bulbGroup.setAttribute('class', 'glow-off');
+      statusText.textContent = defaultConfig.status_off_text;
+      statusText.style.color = '#94a3b8';
+      statusBar.style.background = '#1e293b';
+    }
+  }
+
+  document.getElementById('switchAGroup').onclick = () => { switchA = switchA === 1 ? 2 : 1; updateCircuit(); };
+  document.getElementById('switchBGroup').onclick = () => { switchB = switchB === 1 ? 2 : 1; updateCircuit(); };
+
+  updateCircuit();
+  </script>
+ </body>
+</html>
